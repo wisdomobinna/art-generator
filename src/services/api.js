@@ -1,7 +1,8 @@
+// src/services/api.js
+
 const API_KEY = process.env.REACT_APP_OPENAI_API_KEY;
 const API_URL = 'https://api.openai.com/v1/images/generations';
 
-// api.js
 export const generateImage = async (prompt) => {
   if (!API_KEY) throw new Error('API Key is not configured');
 
@@ -25,7 +26,7 @@ export const generateImage = async (prompt) => {
     }
 
     const data = await response.json();
-    return data.url || data.data[0].url; // Adjust based on API response structure
+    return data.data[0].url;
   } catch (error) {
     console.error('Image generation failed:', error);
     throw error;
