@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { useUser } from '../context/UserContext';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../services/firebase';
+import { useUser } from '../context/UserContext';
 
 const LoginPage = () => {
   const [email, setEmail] = useState('');
@@ -10,7 +10,14 @@ const LoginPage = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const { login } = useUser();
+  const { userId } = useUser();
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (userId) {
+      navigate('/generate');
+    }
+  }, [userId, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -18,16 +25,10 @@ const LoginPage = () => {
     setLoading(true);
 
     try {
-      // Try to sign in with Firebase
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
-      
-      // If successful, update our app's user context
-      login(user.uid);
-      navigate('/generate');
+      await signInWithEmailAndPassword(auth, email, password);
+      // No need to manually navigate - AuthProvider will handle it
     } catch (error) {
       console.error('Login error:', error);
-      // Handle specific Firebase error codes
       switch (error.code) {
         case 'auth/invalid-credential':
           setError('Invalid email or password');
@@ -35,17 +36,13 @@ const LoginPage = () => {
         case 'auth/too-many-requests':
           setError('Too many failed attempts. Please try again later.');
           break;
-        case 'auth/user-not-found':
-          setError('No account found with this email');
-          break;
         default:
-          setError('An error occurred. Please try again.');
+          setError('Error signing in. Please try again.');
       }
-    } finally {
       setLoading(false);
     }
   };
-
+  
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4">
       <div className="max-w-md w-full space-y-8">

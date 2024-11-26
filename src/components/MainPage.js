@@ -1,29 +1,40 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useUser } from '../context/UserContext';
-import { auth } from '../services/firebase';
-import { signOut } from 'firebase/auth';
+import React, { useState, useEffect } from 'react';
 import { generateImage } from '../services/api';
+import { auth, savePromptToDb, getUserPrompts } from '../services/firebase';
+import { useUser } from '../context/UserContext';
+import { useNavigate } from 'react-router-dom';
+import { Loader2, LogOut } from 'lucide-react';
 
 const MainPage = () => {
   const [input, setInput] = useState('');
-  const [isGenerating, setIsGenerating] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [imageUrl, setImageUrl] = useState(null);
   const [error, setError] = useState(null);
-  const [images, setImages] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const { logout } = useUser();
+  const [prompts, setPrompts] = useState([]);
+  const [selectedPrompt, setSelectedPrompt] = useState(null);
+  const { userId, logout } = useUser();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const loadPrompts = async () => {
+      if (!userId) return;
+      try {
+        const userPrompts = await getUserPrompts(userId);
+        setPrompts(userPrompts);
+      } catch (err) {
+        console.error('Error loading prompts:', err);
+      }
+    };
+    loadPrompts();
+  }, [userId]);
 
   const handleLogout = async () => {
     try {
-      setLoading(true);
-      await signOut(auth);
+      await auth.signOut();
       logout();
       navigate('/login');
-    } catch (error) {
-      console.error('Logout error:', error);
-    } finally {
-      setLoading(false);
+    } catch (err) {
+      console.error('Logout error:', err);
     }
   };
 
@@ -31,112 +42,107 @@ const MainPage = () => {
     e.preventDefault();
     if (!input.trim()) return;
 
-    setIsGenerating(true);
+    setIsLoading(true);
     setError(null);
-
+    
     try {
-      const imageUrl = await generateImage(input);
-      setImages(prev => [{
-        url: imageUrl,
+      const url = await generateImage(input);
+      setImageUrl(url);
+      
+      const promptData = {
         prompt: input,
-        timestamp: new Date().toISOString()
-      }, ...prev]);
+        imageUrl: url,
+        timestamp: new Date().toISOString(),
+      };
+      
+      setSelectedPrompt(promptData);
+      await savePromptToDb(userId, promptData);
+      const updatedPrompts = await getUserPrompts(userId);
+      setPrompts(updatedPrompts);
       setInput('');
-    } catch (error) {
-      console.error('Generation error:', error);
-      setError('Failed to generate image. Please try again.');
+    } catch (err) {
+      setError(err.message);
     } finally {
-      setIsGenerating(false);
+      setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="sticky top-0 z-50 flex items-center justify-between h-16 px-4 border-b bg-white/80 backdrop-blur-sm">
-        <div className="flex items-center gap-2">
-          <h1 className="font-semibold">AI Art Generator</h1>
+    <div className="flex h-screen bg-gray-50">
+      <div className="w-64 bg-white border-r overflow-auto">
+        <div className="p-4 border-b">
+          <h2 className="font-semibold">Prompt History</h2>
+          <p className="text-sm text-gray-500 mt-1">{auth.currentUser?.email}</p>
+        </div>
+        <div className="overflow-y-auto">
+          {prompts.map((prompt) => (
+            <div
+              key={prompt.id}
+              onClick={() => setSelectedPrompt(prompt)}
+              className={`p-4 border-b cursor-pointer hover:bg-gray-50 ${
+                selectedPrompt?.id === prompt.id ? 'bg-blue-50' : ''
+              }`}
+            >
+              <p className="text-sm truncate">{prompt.prompt}</p>
+              <p className="text-xs text-gray-500 mt-1">
+                {new Date(prompt.timestamp).toLocaleString()}
+              </p>
+            </div>
+          ))}
         </div>
         <button
           onClick={handleLogout}
-          disabled={loading}
-          className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors disabled:opacity-50"
+          className="w-full p-4 text-left text-sm text-gray-700 hover:bg-gray-100 border-t"
         >
-          {loading ? 'Logging out...' : 'Logout'}
+          <LogOut className="w-4 h-4 inline mr-2" />
+          Logout
         </button>
-      </header>
+      </div>
 
-      {/* Main Content */}
-      <main className="flex-1 overflow-y-auto">
-        <div className="max-w-4xl mx-auto px-4 py-6 space-y-8">
-          {/* Generation Form */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <form onSubmit={handleSubmit}>
-              <div className="relative">
-                <input
-                  type="text"
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  placeholder="Describe the art you want to generate..."
-                  className="w-full p-3 pr-24 rounded-lg border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:ring-opacity-20 focus:outline-none"
-                  disabled={isGenerating}
-                />
-                <button
-                  type="submit"
-                  disabled={isGenerating || !input.trim()}
-                  className="absolute right-2 top-2 px-4 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50"
-                >
-                  {isGenerating ? 'Generating...' : 'Generate'}
-                </button>
-              </div>
-            </form>
+      <div className="flex-1 overflow-auto p-6">
+        <form onSubmit={handleSubmit} className="mb-8">
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="Describe the art you want to generate..."
+              className="flex-1 p-2 border rounded"
+              disabled={isLoading}
+            />
+            <button
+              type="submit"
+              disabled={isLoading || !input.trim()}
+              className="px-4 py-2 bg-blue-500 text-white rounded disabled:bg-gray-300"
+            >
+              {isLoading ? 'Generating...' : 'Generate'}
+            </button>
           </div>
+        </form>
 
-          {/* Error Message */}
-          {error && (
-            <div className="bg-red-50 p-4 rounded-lg">
-              <p className="text-sm text-red-700 text-center">{error}</p>
-            </div>
-          )}
-
-          {/* Generated Images */}
-          <div className="grid grid-cols-1 gap-6">
-            {images.map((image, index) => (
-              <div key={index} className="bg-white rounded-lg shadow overflow-hidden">
-                <img 
-                  src={image.url} 
-                  alt={image.prompt}
-                  className="w-full h-auto"
-                  loading="lazy"
-                />
-                <div className="p-4">
-                  <p className="text-sm text-gray-600">{image.prompt}</p>
-                  <p className="text-xs text-gray-400 mt-1">
-                    {new Date(image.timestamp).toLocaleString()}
-                  </p>
-                </div>
-              </div>
-            ))}
+        {error && (
+          <div className="p-4 mb-4 bg-red-100 text-red-700 rounded">
+            {error}
           </div>
+        )}
 
-          {/* Loading State */}
-          {isGenerating && (
-            <div className="text-center py-12">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-              <p className="text-gray-500">Generating your artwork...</p>
-            </div>
-          )}
+        {(selectedPrompt || imageUrl) && (
+          <div className="border rounded p-4 bg-white">
+            <img 
+              src={selectedPrompt?.imageUrl || imageUrl} 
+              alt={selectedPrompt?.prompt || 'Generated artwork'} 
+              className="w-full h-auto rounded"
+            />
+            <p className="mt-2 text-gray-700">{selectedPrompt?.prompt || input}</p>
+          </div>
+        )}
 
-          {/* Empty State */}
-          {!isGenerating && images.length === 0 && (
-            <div className="text-center py-12">
-              <p className="text-gray-500">
-                Your generated images will appear here
-              </p>
-            </div>
-          )}
-        </div>
-      </main>
+        {isLoading && (
+          <div className="text-center p-4">
+            <Loader2 className="animate-spin h-8 w-8 mx-auto" />
+          </div>
+        )}
+      </div>
     </div>
   );
 };

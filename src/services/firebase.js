@@ -1,7 +1,6 @@
-
 import { initializeApp } from 'firebase/app';
-import { getAuth, signInWithEmailAndPassword, signOut, createUserWithEmailAndPassword } from 'firebase/auth';
-import { getFirestore, doc, setDoc } from 'firebase/firestore';
+import { getFirestore, collection, addDoc, query, where, orderBy, getDocs } from 'firebase/firestore';
+import { getAuth } from 'firebase/auth';
 
 const firebaseConfig = {
   apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
@@ -12,55 +11,42 @@ const firebaseConfig = {
   appId: process.env.REACT_APP_FIREBASE_APP_ID
 };
 
-// Initialize Firebase
 const app = initializeApp(firebaseConfig);
-export const auth = getAuth(app);
-export const db = getFirestore(app);
+const db = getFirestore(app);
+const auth = getAuth(app);
 
-// Login user
-export const loginUser = async (email, password) => {
+export const savePromptToDb = async (userId, promptData) => {
   try {
-    const userCredential = await signInWithEmailAndPassword(auth, email, password);
-    const user = userCredential.user;
-    
-    // Update last login time in Firestore
-    await setDoc(doc(db, 'users', user.uid), {
-      lastLogin: new Date().toISOString()
-    }, { merge: true });
-
-    return user.uid;
-  } catch (error) {
-    console.error('Login error:', error);
-    throw error;
-  }
-};
-
-// Logout user
-export const logoutUser = async () => {
-  try {
-    await signOut(auth);
-  } catch (error) {
-    console.error('Logout error:', error);
-    throw error;
-  }
-};
-
-// Create user
-export const createUser = async (email, password) => {
-  try {
-    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-    const user = userCredential.user;
-
-    // Create user document in Firestore
-    await setDoc(doc(db, 'users', user.uid), {
-      email,
-      createdAt: new Date().toISOString(),
-      lastLogin: new Date().toISOString()
+    const promptsRef = collection(db, 'prompts');
+    await addDoc(promptsRef, {
+      userId,
+      ...promptData,
+      timestamp: new Date().toISOString()
     });
-
-    return user.uid;
   } catch (error) {
-    console.error('Create user error:', error);
+    console.error('Error saving prompt:', error);
     throw error;
   }
 };
+
+export const getUserPrompts = async (userId) => {
+  try {
+    const promptsRef = collection(db, 'prompts');
+    const q = query(
+      promptsRef,
+      where('userId', '==', userId),
+      orderBy('timestamp', 'desc')
+    );
+
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+  } catch (error) {
+    console.error('Error getting prompts:', error);
+    throw error;
+  }
+};
+
+export { auth, db };

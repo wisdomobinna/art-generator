@@ -1,29 +1,33 @@
 const API_KEY = process.env.REACT_APP_OPENAI_API_KEY;
+const API_URL = 'https://api.openai.com/v1/images/generations';
 
+// api.js
 export const generateImage = async (prompt) => {
+  if (!API_KEY) throw new Error('API Key is not configured');
+
   try {
-    const response = await fetch('https://api.openai.com/v1/images/generations', {
+    const response = await fetch(API_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${API_KEY}`
       },
       body: JSON.stringify({
-        prompt,
+        model: "dall-e-2",
+        prompt: prompt,
         n: 1,
-        size: '1024x1024',
-        response_format: 'url'
+        size: "512x512"
       })
     });
 
     if (!response.ok) {
-      throw new Error('Failed to generate image');
+      throw new Error(`API Error: ${response.status}`);
     }
 
     const data = await response.json();
-    return data.data[0].url;
+    return data.url || data.data[0].url; // Adjust based on API response structure
   } catch (error) {
-    console.error('Error generating image:', error);
+    console.error('Image generation failed:', error);
     throw error;
   }
 };
