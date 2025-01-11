@@ -1,61 +1,20 @@
-import { 
-  collection, 
-  addDoc, 
-  query, 
-  where, 
-  getDocs, 
-  orderBy 
-} from 'firebase/firestore';
 import { db } from './firebase';
+import { collection, addDoc, query, where, getDocs } from 'firebase/firestore';
 
-// Save a new prompt and its generated image to Firestore
-export const savePrompt = async ({
-  userId,
-  prompt,
-  generatedImageUrl,
-  referenceImageUrl = null,
-  status = 'completed',
-  timestamp
-}) => {
-  try {
-    const promptsRef = collection(db, 'prompts');
-    const promptData = {
-      userId,
-      prompt,
-      generatedImageUrl,
-      referenceImageUrl,
-      status,
-      timestamp
-    };
-
-    const docRef = await addDoc(promptsRef, promptData);
-    return {
-      id: docRef.id,
-      ...promptData
-    };
-  } catch (error) {
-    console.error('Error saving prompt:', error);
-    throw error;
-  }
+export const savePrompt = async (userId, prompt, imageUrl) => {
+  return await addDoc(collection(db, 'prompts'), {
+    userId,
+    prompt,
+    imageUrl,
+    timestamp: new Date().toISOString()
+  });
 };
 
-// Get all prompts for a specific user
 export const getUserPrompts = async (userId) => {
-  try {
-    const promptsRef = collection(db, 'prompts');
-    const q = query(
-      promptsRef,
-      where('userId', '==', userId),
-      orderBy('timestamp', 'desc')
-    );
-
-    const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    }));
-  } catch (error) {
-    console.error('Error getting user prompts:', error);
-    throw error;
-  }
+  const q = query(collection(db, 'prompts'), where('userId', '==', userId));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => ({
+    id: doc.id,
+    ...doc.data()
+  }));
 };

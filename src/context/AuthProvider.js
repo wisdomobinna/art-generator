@@ -1,41 +1,32 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import { onAuthStateChanged } from 'firebase/auth';
-import { auth } from '../services/firebase';
+// AuthProvider.js
+import { useEffect } from 'react';
 import { useUser } from './UserContext';
-
-const AuthContext = createContext();
+import { validateLoginId } from '../services/firebase';
 
 export const AuthProvider = ({ children }) => {
-  const [loading, setLoading] = useState(true);
-  const { login, logout } = useUser();
+  const { login } = useUser();
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        // User is signed in
-        login(user.uid);
-      } else {
-        // User is signed out
-        logout();
+    // Check for existing session
+    const checkSession = async () => {
+      const savedLoginId = sessionStorage.getItem('loginId');
+      if (savedLoginId) {
+        try {
+          // Validate the stored login ID
+          await validateLoginId(savedLoginId);
+          await login(savedLoginId);
+        } catch (error) {
+          // If validation fails, clear the session
+          sessionStorage.removeItem('loginId');
+          console.error('Session restoration failed:', error);
+        }
       }
-      setLoading(false);
-    });
+    };
 
-    // Cleanup subscription on unmount
-    return () => unsubscribe();
-  }, [login, logout]);
+    checkSession();
+  }, [login]);
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
-      </div>
-    );
-  }
-
-  return <AuthContext.Provider value={{}}>{children}</AuthContext.Provider>;
+  return children;
 };
 
-export const useAuth = () => {
-  return useContext(AuthContext);
-};
+export default AuthProvider;

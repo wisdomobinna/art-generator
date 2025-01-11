@@ -1,40 +1,24 @@
+import AdminPage from './components/AdminPage';
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { UserProvider } from './context/UserContext';
-import { useUser } from './context/UserContext';
 import LoginPage from './components/LoginPage';
-import SignupPage from './components/SignupPage';
 import MainPage from './components/MainPage';
-
-const ProtectedRoute = ({ children }) => {
-  const { userId } = useUser();
-  
-  if (!userId) {
-    return <Navigate to="/login" />;
-  }
-  
-  return children;
-};
+import InstructionsPage from './components/InstructionsPage';
 
 const App = () => {
   return (
-    <UserProvider>
-      <Router>
+    <Router>
+      <UserProvider>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
-          <Route path="/signup" element={<SignupPage />} />
-          <Route 
-            path="/generate" 
-            element={
-              <ProtectedRoute>
-                <MainPage />
-              </ProtectedRoute>
-            } 
-          />
-          <Route path="/" element={<Navigate to="/login" />} />
+          <Route path="/" element={<MainPage />} />
+          <Route path="/instructions" element={<InstructionsPage />} />
+          <Route path="/admin" element={<AdminPage />} /> 
+          <Route path="*" element={<Navigate to="/login" />} />
         </Routes>
-      </Router>
-    </UserProvider>
+      </UserProvider>
+    </Router>
   );
 };
 
