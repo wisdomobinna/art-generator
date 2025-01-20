@@ -1,4 +1,3 @@
-// server.js
 const express = require('express');
 const cors = require('cors');
 const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
@@ -6,6 +5,11 @@ const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch
 const app = express();
 
 app.use(cors());
+
+// Add a test route
+app.get('/', (req, res) => {
+  res.send('Proxy server is running!');
+});
 
 app.get('/proxy-image', async (req, res) => {
   try {

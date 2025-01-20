@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { generateImage } from '../services/api';
+import UploadRestrictionAlert from '../components/UploadRestrictionAlert';
 import {
   db,
   savePromptToDb,
@@ -20,6 +21,7 @@ import { Loader2, ArrowUp, Download, LogOut, Paperclip, X, Info as InfoIcon, Che
 
 const MainPage = () => {
   const [input, setInput] = useState('');
+  const [showUploadAlert, setShowUploadAlert] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingPrompts, setIsLoadingPrompts] = useState(true);
   const [imageUrl, setImageUrl] = useState(null);
@@ -124,6 +126,18 @@ const MainPage = () => {
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
     if (file) {
+      // Check if user has CAI25 login ID
+      const isCAI25User = loginId?.startsWith('CAI25');
+      
+      if (isCAI25User) {
+        setShowUploadAlert(true);
+        // Clear the file input
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+        return;
+      }
+  
       if (file.size > 4 * 1024 * 1024) {
         setError('Image size should be less than 4MB');
         return;
@@ -182,56 +196,57 @@ const MainPage = () => {
       let originalImageUrl = null;
       
       if (uploadedImage && uploadedImage.file) {
-        console.log('Uploading original image...');
         originalImageUrl = await uploadOriginalImage(uploadedImage.file, loginId);
-        console.log('Original image uploaded:', originalImageUrl);
       }
   
-      console.log('Generating image...');
-      const url = await generateImage(input);
-      console.log('Image generated successfully:', url);
-      
-      setImageUrl(url);
+      // Get the generation result
+      const generationResult = await generateImage(input, loginId);
+      console.log('Generation result:', generationResult);
+      setImageUrl(generationResult.url);
       
       if (loginId) {
         try {
-          const proxyUrl = `http://localhost:3001/proxy-image?url=${encodeURIComponent(url)}`;
-          console.log('Fetching from proxy:', proxyUrl);
+          // Fetch the image through your proxy
+          const proxyUrl = `${process.env.REACT_APP_API_URL}/proxy-image?url=${encodeURIComponent(generationResult.url)}`;
+          console.log('Fetching image through proxy:', proxyUrl);
           
-          const response = await fetch(proxyUrl);
-          if (!response.ok) {
-            throw new Error(`Proxy server error: ${response.status}`);
+          const imageResponse = await fetch(proxyUrl);
+          if (!imageResponse.ok) {
+            console.error('Proxy response not OK:', imageResponse.status);
+            throw new Error(`Failed to fetch image: ${imageResponse.status}`);
           }
           
-          const blob = await response.blob();
-          if (!blob || blob.size === 0) {
-            throw new Error('Received empty image data');
-          }
-          
-          console.log('Image blob size:', blob.size, 'bytes');
-          console.log('Content type:', blob.type);
+          // Get the blob and verify it
+          const imageBlob = await imageResponse.blob();
+          console.log('Received blob:', {
+            size: imageBlob.size,
+            type: imageBlob.type
+          });
   
+          if (!imageBlob || imageBlob.size === 0) {
+            throw new Error('Received empty image data from proxy');
+          }
+  
+          // Create a new blob with explicit type if needed
+          const processedBlob = new Blob([imageBlob], { type: 'image/png' });
+          
           const promptData = {
             prompt: input,
+            enhancedPrompt: generationResult.enhancedPrompt,
             originalImageUrl: originalImageUrl,
             timestamp: new Date().toISOString(),
           };
           
-          console.log('Saving prompt with data:', promptData);
+          console.log('Saving with prompt data:', promptData);
           
-          try {
-            const result = await savePromptToDb(loginId, promptData, blob);
-            console.log('Successfully saved to database:', result);
-            
-            const updatedPrompts = await getUserPrompts(loginId);
-            setPrompts(updatedPrompts);
-          } catch (saveError) {
-            console.error('Error saving to database:', saveError);
-            throw new Error(`Failed to save to database: ${saveError.message}`);
-          }
-        } catch (proxyError) {
-          console.error('Proxy error:', proxyError);
-          throw new Error(`Failed to process image: ${proxyError.message}`);
+          const result = await savePromptToDb(loginId, promptData, processedBlob);
+          console.log('Save result:', result);
+          
+          const updatedPrompts = await getUserPrompts(loginId);
+          setPrompts(updatedPrompts);
+        } catch (saveError) {
+          console.error('Error in save process:', saveError);
+          throw new Error(`Failed to save image: ${saveError.message}`);
         }
       }
       
@@ -247,6 +262,7 @@ const MainPage = () => {
       setIsLoading(false);
     }
   };
+  
 
   const handleDownload = async (imageUrl) => {
     window.open(imageUrl, '_blank');
@@ -276,6 +292,11 @@ const MainPage = () => {
 
   return (
     <div className="flex h-screen bg-gray-50">
+    {showUploadAlert && (
+      <UploadRestrictionAlert 
+        onClose={() => setShowUploadAlert(false)} 
+      />
+    )}
       {/* Sidebar */}
       <div className="w-72 bg-white border-r overflow-hidden flex flex-col">
         {/* Logo Section */}

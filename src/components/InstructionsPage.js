@@ -1,59 +1,50 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
-
 const InstructionsPage = () => {
   return (
     <div className="flex h-screen bg-gray-50">
-      {/* Sidebar structure remains the same */}
-      
       {/* Main Content */}
       <div className="flex-1 overflow-auto">
         <div className="max-w-4xl mx-auto p-8">
-            {/* Add Back Button */}
-            <div className="mb-6">
+          {/* Back Button */}
+          <div className="mb-6">
             <Link to="/"
               className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-600 bg-white rounded-lg border hover:bg-gray-50 transition-colors">
               <ArrowLeft className="w-4 h-4" />
               Back to Generator
             </Link>
           </div>
+          
           <div className="bg-white rounded-lg shadow-sm p-8">
             <h1 className="text-3xl font-bold text-gray-900 mb-6">
-              AI Art Study - Instructions & Guidelines
+              AI Art Competition - Guidelines
             </h1>
 
             <div className="prose max-w-none">
               <section className="mb-8">
                 <h2 className="text-xl font-semibold text-gray-900 mb-4">
-                  About the Study
+                  About the Competition
                 </h2>
                 <p className="text-gray-700 mb-4">
-                  This research explores perceptions of AI-generated art with a focus on ownership, authorship, and value. 
-                  The study aims to understand how different stakeholders view AI-generated artwork to help inform future 
-                  policies and creative practices.
+                  Welcome to our AI Art Competition! This innovative competition showcases the creative 
+                  possibilities of AI-generated artwork. Artists can participate in two categories: 
+                  AI-only creations or AI-involved collaborations, competing for prizes and the opportunity 
+                  to have their work displayed at the Georgetown University Community Gallery.
                 </p>
               </section>
 
               <section className="mb-8">
                 <h2 className="text-xl font-semibold text-gray-900 mb-4">
-                  Participation Options & Rewards
+                  Prizes & Recognition
                 </h2>
                 <div className="bg-gray-50 p-6 rounded-lg mb-4">
-                  <h3 className="font-semibold mb-2">Creator Participants</h3>
-                  <ul className="list-disc pl-5 space-y-2 mb-4">
-                    <li>Submit original artwork using our AI tools</li>
-                    <li>Complete a 15-minute submission survey</li>
-                    <li>Base compensation: $10 gift card</li>
-                    <li>Top 10 artworks: Additional $90 ($100 total)</li>
-                    <li>Category winners: Additional $150 ($250 total)</li>
-                  </ul>
-
-                  <h3 className="font-semibold mb-2">Evaluator Participants</h3>
+                  <h3 className="font-semibold mb-2">Award Structure</h3>
                   <ul className="list-disc pl-5 space-y-2">
-                    <li>Review submitted artworks</li>
-                    <li>Complete a 30-minute evaluation survey</li>
-                    <li>Compensation: $15</li>
+                    <li>Participation Award: $15 gift card for all valid submissions</li>
+                    <li>Top 12 Artworks: Additional $100 prize ($115 total)</li>
+                    <li>Category Winners: Additional $150 prize ($250 total)</li>
+                    <li>Gallery Exhibition: Selected works will be displayed at Georgetown University</li>
                   </ul>
                 </div>
               </section>
@@ -62,52 +53,55 @@ const InstructionsPage = () => {
                 <h2 className="text-xl font-semibold text-gray-900 mb-4">
                   How to Participate
                 </h2>
-                <div className="space-y-4">
-                  <div className="bg-blue-50 p-6 rounded-lg">
-                    <h3 className="font-semibold mb-2">For Creators:</h3>
-                    <ol className="list-decimal pl-5 space-y-2">
-                      <li>Sign up using the registration form</li>
-                      <li>Create your artwork using our AI interface (DALL-E or Midjourney)</li>
-                      <li>Submit your work through the provided submission form</li>
-                      <li>Complete the artwork evaluation survey</li>
-                    </ol>
-                  </div>
-
-                  <div className="bg-green-50 p-6 rounded-lg">
-                    <h3 className="font-semibold mb-2">For Evaluators:</h3>
-                    <ol className="list-decimal pl-5 space-y-2">
-                      <li>Sign up using the registration form</li>
-                      <li>Receive email with evaluation survey link</li>
-                      <li>Review and evaluate assigned artworks</li>
-                      <li>Complete the evaluation survey</li>
-                    </ol>
-                  </div>
+                <div className="bg-blue-50 p-6 rounded-lg">
+                  <h3 className="font-semibold mb-2">Competition Process:</h3>
+                  <ol className="list-decimal pl-5 space-y-2">
+                    <li>Choose your category: AI-only or AI-involved</li>
+                    <li>Create your artwork using our AI tools (DALL-E)</li>
+                    <li>Submit your final piece through the platform</li>
+                    <li>Provide a brief description of your creative process</li>
+                  </ol>
                 </div>
               </section>
 
               <section className="mb-8">
                 <h2 className="text-xl font-semibold text-gray-900 mb-4">
-                  Rules and Guidelines
+                  Categories & Guidelines
                 </h2>
-                <ul className="list-disc pl-5 space-y-2">
-                  <li>Participants must be 18 years or older</li>
-                  <li>All submissions must be original work created through our platform</li>
-                  <li>Creators can submit under two categories: AI-only or AI-involved</li>
-                  <li>Top rated artworks will be displayed in the Georgetown University Community Gallery</li>
-                  <li>All data collected will be used for research purposes only</li>
-                  <li>Participants can withdraw at any time before survey submission</li>
-                </ul>
+                <div className="space-y-4">
+                  <div className="bg-green-50 p-6 rounded-lg">
+                    <h3 className="font-semibold mb-2">AI-Only Category:</h3>
+                    <ul className="list-disc pl-5 space-y-2">
+                      <li>Create artwork using only AI prompts</li>
+                      <li>Focus on creative prompt engineering</li>
+                      <li>No external image uploads allowed</li>
+                      <li>Multiple submissions permitted</li>
+                    </ul>
+                  </div>
+
+                  <div className="bg-purple-50 p-6 rounded-lg">
+                    <h3 className="font-semibold mb-2">AI-Involved Category:</h3>
+                    <ul className="list-disc pl-5 space-y-2">
+                      <li>Combine AI generation with uploaded images</li>
+                      <li>Create hybrid artworks using both AI and traditional methods</li>
+                      <li>Document your creative process</li>
+                      <li>Multiple submissions permitted</li>
+                    </ul>
+                  </div>
+                </div>
               </section>
 
               <section className="bg-yellow-50 p-6 rounded-lg">
                 <h2 className="text-xl font-semibold text-gray-900 mb-4">
-                  Important Notes
+                  Competition Rules
                 </h2>
                 <ul className="list-disc pl-5 space-y-2">
-                  <li>All responses are confidential and will be de-identified</li>
-                  <li>The study is completely voluntary</li>
-                  <li>No prior experience with AI art is required</li>
-                  <li>Exhibition details will be communicated to selected participants</li>
+                  <li>All submissions must be original work created through our platform</li>
+                  <li>Participants must be 18 years or older</li>
+                  <li>Artwork must not contain inappropriate or offensive content</li>
+                  <li>Winners will be selected based on creativity, technical execution, and artistic merit</li>
+                  <li>Submission deadline: February 25, 2025</li>
+                  <li>Exhibition would hold on April 8, 2025</li>
                 </ul>
               </section>
             </div>

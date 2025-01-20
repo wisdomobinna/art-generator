@@ -12,7 +12,8 @@ import {
   updateDoc,
   addDoc,
   serverTimestamp,
-  onSnapshot
+  onSnapshot,
+  limit
 } from 'firebase/firestore';
 import {
   getStorage,
@@ -62,7 +63,6 @@ const formatLoginId = (id) => {
   return id;
 };
 
-
 const handleFirebaseOperation = async (operation, errorMessage) => {
   try {
     return await operation();
@@ -100,6 +100,41 @@ export const validateLoginId = async (loginId) => {
       ...loginData
     };
   }, 'Authentication failed');
+};
+
+// Add conversation context functions
+export const saveConversationContext = async (loginId, prompt, enhancedPrompt, imageUrl) => {
+  return handleFirebaseOperation(async () => {
+    const contextRef = collection(db, 'conversationContext');
+    await addDoc(contextRef, {
+      loginId,
+      originalPrompt: prompt,
+      enhancedPrompt,
+      imageUrl,
+      timestamp: serverTimestamp()
+    });
+  }, 'Failed to save conversation context');
+};
+
+export const getConversationContext = async (loginId, limitCount = 3) => {
+  return handleFirebaseOperation(async () => {
+    const contextRef = collection(db, 'conversationContext');
+    const q = query(
+      contextRef,
+      where('loginId', '==', loginId),
+      orderBy('timestamp', 'desc'),
+      limit(limitCount)  // Now this will work
+    );
+
+    const snapshot = await getDocs(q);
+    return snapshot.docs
+      .map(doc => ({
+        originalPrompt: doc.data().originalPrompt,
+        enhancedPrompt: doc.data().enhancedPrompt,
+        timestamp: doc.data().timestamp
+      }))
+      .reverse(); // Reverse to get chronological order
+  }, 'Failed to retrieve conversation context');
 };
 
 
@@ -209,21 +244,29 @@ export const updateUserTimeSpent = async (loginId) => {
 
 export const savePromptToDb = async (loginId, promptData, imageBlob) => {
   return handleFirebaseOperation(async () => {
-    if (!imageBlob || imageBlob.size === 0) {
-      throw new Error('Invalid image data');
+    console.log('Starting savePromptToDb:', {
+      loginId,
+      hasBlob: !!imageBlob,
+      blobSize: imageBlob?.size,
+      blobType: imageBlob?.type,
+      promptData
+    });
+
+    if (!imageBlob || !(imageBlob instanceof Blob)) {
+      console.error('Invalid blob type:', imageBlob);
+      throw new Error('Invalid image data: Blob not provided');
+    }
+
+    if (imageBlob.size === 0) {
+      console.error('Empty blob received');
+      throw new Error('Invalid image data: Empty blob');
     }
 
     const isCAI = loginId.startsWith('CAI25');
 
-    // Validate that CAI users aren't uploading images
     if (isCAI && promptData.originalImageUrl) {
       throw new Error('AI-only users cannot upload images');
     }
-
-    console.log('Starting upload process for loginId:', loginId);
-    console.log('Image blob size:', imageBlob.size);
-    console.log('Image blob type:', imageBlob.type);
-    console.log('Original Image URL:', promptData.originalImageUrl);
 
     const category = promptData.originalImageUrl ? 'AI-involved' : 'AI-only';
     
@@ -234,16 +277,15 @@ export const savePromptToDb = async (loginId, promptData, imageBlob) => {
       : `ai-only-images/${loginId}`;
     const filename = `${basePath}/${timestamp}-${randomString}.png`;
     
-    console.log('Generated filename:', filename);
-    console.log('Category:', category);
+    console.log('Generated storage path:', filename);
 
     const storageRef = ref(storage, filename);
-
     const metadata = {
       contentType: 'image/png',
       customMetadata: {
         loginId: loginId,
         prompt: promptData.prompt || '',
+        enhancedPrompt: promptData.enhancedPrompt || '',
         timestamp: String(timestamp),
         category: category,
         filename: filename
@@ -263,6 +305,7 @@ export const savePromptToDb = async (loginId, promptData, imageBlob) => {
       const docRef = await addDoc(promptsRef, {
         loginId,
         prompt: promptData.prompt || '',
+        enhancedPrompt: promptData.enhancedPrompt || promptData.prompt,
         imageUrl: downloadURL,
         storagePath: filename,
         timestamp: serverTimestamp(),
@@ -272,6 +315,22 @@ export const savePromptToDb = async (loginId, promptData, imageBlob) => {
       });
 
       console.log('Successfully saved to Firestore with ID:', docRef.id);
+
+      // Save to conversation context if it's an AI generation
+      if (category === 'AI-only') {
+        try {
+          await saveConversationContext(
+            loginId,
+            promptData.prompt,
+            promptData.enhancedPrompt || promptData.prompt,
+            downloadURL
+          );
+          console.log('Conversation context saved successfully');
+        } catch (contextError) {
+          console.error('Failed to save conversation context:', contextError);
+          // Don't throw here - we still want to return the successful generation
+        }
+      }
 
       return { id: docRef.id, imageUrl: downloadURL };
     } catch (error) {
@@ -321,7 +380,6 @@ export const formatTimestamp = (timestamp) => {
   }
 };
 
-// Helper function to format time duration
 export const formatDuration = (seconds) => {
   if (!seconds) return '0s';
   
