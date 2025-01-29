@@ -13,7 +13,8 @@ import {
   addDoc,
   serverTimestamp,
   onSnapshot,
-  limit
+  limit,
+  writeBatch
 } from 'firebase/firestore';
 import {
   getStorage,
@@ -106,15 +107,26 @@ export const validateLoginId = async (loginId) => {
 export const saveConversationContext = async (loginId, prompt, enhancedPrompt, imageUrl) => {
   return handleFirebaseOperation(async () => {
     const contextRef = collection(db, 'conversationContext');
+    
+    // Add new context
     await addDoc(contextRef, {
       loginId,
       originalPrompt: prompt,
       enhancedPrompt,
       imageUrl,
-      timestamp: serverTimestamp()
+      timestamp: serverTimestamp(),
+      isLatest: true
     });
+
+    // Update previous entries
+    const q = query(contextRef, where('loginId', '==', loginId), where('isLatest', '==', true));
+    const snapshot = await getDocs(q);
+    
+    const updatePromises = snapshot.docs.map(doc => updateDoc(doc.ref, { isLatest: false }));
+    await Promise.all(updatePromises);
   }, 'Failed to save conversation context');
 };
+
 
 export const getConversationContext = async (loginId, limitCount = 3) => {
   return handleFirebaseOperation(async () => {
@@ -244,103 +256,85 @@ export const updateUserTimeSpent = async (loginId) => {
 
 export const savePromptToDb = async (loginId, promptData, imageBlob) => {
   return handleFirebaseOperation(async () => {
-    console.log('Starting savePromptToDb:', {
-      loginId,
-      hasBlob: !!imageBlob,
-      blobSize: imageBlob?.size,
-      blobType: imageBlob?.type,
-      promptData
-    });
-
     if (!imageBlob || !(imageBlob instanceof Blob)) {
-      console.error('Invalid blob type:', imageBlob);
       throw new Error('Invalid image data: Blob not provided');
     }
 
     if (imageBlob.size === 0) {
-      console.error('Empty blob received');
       throw new Error('Invalid image data: Empty blob');
     }
 
     const isCAI = loginId.startsWith('CAI25');
-
     if (isCAI && promptData.originalImageUrl) {
       throw new Error('AI-only users cannot upload images');
     }
 
     const category = promptData.originalImageUrl ? 'AI-involved' : 'AI-only';
-    
     const timestamp = Date.now();
     const randomString = Math.random().toString(36).substring(2, 15);
-    const basePath = category === 'AI_involved' 
-      ? `ai-involved-images/${loginId}`
-      : `ai-only-images/${loginId}`;
+    const basePath = `${category === 'AI-involved' ? 'ai-involved-images' : 'ai-only-images'}/${loginId}`;
     const filename = `${basePath}/${timestamp}-${randomString}.png`;
-    
-    console.log('Generated storage path:', filename);
 
     const storageRef = ref(storage, filename);
     const metadata = {
       contentType: 'image/png',
       customMetadata: {
-        loginId: loginId,
+        loginId,
         prompt: promptData.prompt || '',
         enhancedPrompt: promptData.enhancedPrompt || '',
         timestamp: String(timestamp),
-        category: category,
-        filename: filename
+        category,
+        filename
       }
     };
 
-    console.log('Uploading with metadata:', metadata);
+    const uploadResult = await uploadBytes(storageRef, imageBlob, metadata);
+    const downloadURL = await getDownloadURL(uploadResult.ref);
 
-    try {
-      const uploadResult = await uploadBytes(storageRef, imageBlob, metadata);
-      console.log('Upload successful:', uploadResult);
+    const promptsRef = collection(db, 'prompts');
+    const docRef = await addDoc(promptsRef, {
+      loginId,
+      prompt: promptData.prompt || '',
+      enhancedPrompt: promptData.enhancedPrompt || promptData.prompt,
+      imageUrl: downloadURL,
+      storagePath: filename,
+      timestamp: serverTimestamp(),
+      category,
+      originalImageUrl: promptData.originalImageUrl || null,
+      isLatest: true
+    });
 
-      const downloadURL = await getDownloadURL(uploadResult.ref);
-      console.log('Download URL generated:', downloadURL);
-
-      const promptsRef = collection(db, 'prompts');
-      const docRef = await addDoc(promptsRef, {
-        loginId,
-        prompt: promptData.prompt || '',
-        enhancedPrompt: promptData.enhancedPrompt || promptData.prompt,
-        imageUrl: downloadURL,
-        storagePath: filename,
-        timestamp: serverTimestamp(),
-        category: category,
-        originalImageUrl: promptData.originalImageUrl || null,
-        fileSize: imageBlob.size
-      });
-
-      console.log('Successfully saved to Firestore with ID:', docRef.id);
-
-      // Save to conversation context if it's an AI generation
-      if (category === 'AI-only') {
-        try {
-          await saveConversationContext(
-            loginId,
-            promptData.prompt,
-            promptData.enhancedPrompt || promptData.prompt,
-            downloadURL
-          );
-          console.log('Conversation context saved successfully');
-        } catch (contextError) {
-          console.error('Failed to save conversation context:', contextError);
-          // Don't throw here - we still want to return the successful generation
-        }
+    // Update previous entries
+    const q = query(
+      promptsRef,
+      where('loginId', '==', loginId),
+      where('isLatest', '==', true)
+    );
+    const snapshot = await getDocs(q);
+    
+    // Update individual documents instead of using batch
+    const updatePromises = snapshot.docs.map(doc => {
+      if (doc.id !== docRef.id) {
+        return updateDoc(doc.ref, { isLatest: false });
       }
+      return Promise.resolve();
+    });
+    
+    await Promise.all(updatePromises);
 
-      return { id: docRef.id, imageUrl: downloadURL };
-    } catch (error) {
-      console.error('Detailed upload error:', error);
-      if (error.code) console.error('Error code:', error.code);
-      if (error.message) console.error('Error message:', error.message);
-      throw error;
-    }
+    // Save to conversation context
+    await saveConversationContext(
+      loginId,
+      promptData.prompt,
+      promptData.enhancedPrompt || promptData.prompt,
+      downloadURL
+    );
+
+    return { id: docRef.id, imageUrl: downloadURL };
   }, 'Failed to save generation');
 };
+
+
 
 export const getUserPrompts = async (loginId) => {
   return handleFirebaseOperation(async () => {

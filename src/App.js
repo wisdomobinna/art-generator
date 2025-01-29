@@ -6,6 +6,8 @@ import MainPage from './components/MainPage';
 import InstructionsPage from './components/InstructionsPage';
 import GuidelinePage from './components/GuidelinePage'; // Add this import
 import AdminPage from './components/AdminPage';
+import ImageAnalyzer from './components/ImageAnalyzer';
+
 
 const App = () => {
   return (
@@ -18,10 +20,12 @@ const App = () => {
           <Route path="/guide" element={<GuidelinePage />} /> {/* Add this route */}
           <Route path="/admin" element={<AdminPage />} />
           <Route path="*" element={<Navigate to="/login" />} />
+          <Route path="/analyze" element={<ImageAnalyzer />} />
         </Routes>
       </UserProvider>
     </Router>
   );
 };
+
 
 export default App;

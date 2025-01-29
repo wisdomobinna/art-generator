@@ -126,6 +126,8 @@ const MainPage = () => {
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
     if (file) {
+      console.log('File type:', file.type);
+      console.log('File size:', file.size);
       // Check if user has CAI25 login ID
       const isCAI25User = loginId?.startsWith('CAI25');
       
@@ -138,8 +140,8 @@ const MainPage = () => {
         return;
       }
   
-      if (file.size > 4 * 1024 * 1024) {
-        setError('Image size should be less than 4MB');
+      if (file.size > 10 * 1024 * 1024) {
+        setError('Image size should be less than 10MB');
         return;
       }
   
@@ -199,35 +201,20 @@ const MainPage = () => {
         originalImageUrl = await uploadOriginalImage(uploadedImage.file, loginId);
       }
   
-      // Get the generation result
-      const generationResult = await generateImage(input, loginId);
+      // Pass uploadedImage.file to generateImage
+      const generationResult = await generateImage(input, loginId, uploadedImage?.file);
       console.log('Generation result:', generationResult);
       setImageUrl(generationResult.url);
       
       if (loginId) {
         try {
-          // Fetch the image through your proxy
           const proxyUrl = `${process.env.REACT_APP_API_URL}/proxy-image?url=${encodeURIComponent(generationResult.url)}`;
-          console.log('Fetching image through proxy:', proxyUrl);
-          
           const imageResponse = await fetch(proxyUrl);
-          if (!imageResponse.ok) {
-            console.error('Proxy response not OK:', imageResponse.status);
-            throw new Error(`Failed to fetch image: ${imageResponse.status}`);
-          }
+          if (!imageResponse.ok) throw new Error(`Failed to fetch image: ${imageResponse.status}`);
           
-          // Get the blob and verify it
           const imageBlob = await imageResponse.blob();
-          console.log('Received blob:', {
-            size: imageBlob.size,
-            type: imageBlob.type
-          });
+          if (!imageBlob || imageBlob.size === 0) throw new Error('Received empty image data from proxy');
   
-          if (!imageBlob || imageBlob.size === 0) {
-            throw new Error('Received empty image data from proxy');
-          }
-  
-          // Create a new blob with explicit type if needed
           const processedBlob = new Blob([imageBlob], { type: 'image/png' });
           
           const promptData = {
@@ -237,24 +224,17 @@ const MainPage = () => {
             timestamp: new Date().toISOString(),
           };
           
-          console.log('Saving with prompt data:', promptData);
-          
           const result = await savePromptToDb(loginId, promptData, processedBlob);
-          console.log('Save result:', result);
-          
           const updatedPrompts = await getUserPrompts(loginId);
           setPrompts(updatedPrompts);
         } catch (saveError) {
-          console.error('Error in save process:', saveError);
           throw new Error(`Failed to save image: ${saveError.message}`);
         }
       }
       
       setInput('');
       setUploadedImage(null);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
+      if (fileInputRef.current) fileInputRef.current.value = '';
     } catch (err) {
       console.error('Detailed error in handleSubmit:', err);
       setError(err.message || 'Failed to generate or save image');
@@ -262,6 +242,7 @@ const MainPage = () => {
       setIsLoading(false);
     }
   };
+
   
 
   const handleDownload = async (imageUrl) => {
@@ -383,6 +364,7 @@ const MainPage = () => {
             <LogOut className="w-4 h-4" />
             <span>Logout</span>
           </button>
+          {/* <Link to="/analyze" className="text-blue-500 hover:underline">Image Analyzer</Link> */}
         </div>
   
         {/* Main Chat Area with Scrolling */}
